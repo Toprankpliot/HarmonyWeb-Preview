@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v201</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v202</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v201) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v202) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -41976,5 +41976,21 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   }catch(e){}
 })();
 </script>
+
+<style id="hw202-css">
+/* v202 (user report 2026-11-17, Pages preview on his phone): the two
+   piano buttons — #hw58-piano-btn (open piano) and #hw88-piano-toggle
+   (Piano: ON/OFF) — are anchored to the right edge of #hw70-ui, which
+   is pinned to the FULL stage box (~1100px wide). At phone widths the
+   stage overflows the screen, so both buttons sat ~600px off-screen
+   right: present in the DOM, never visible. At the app's own mobile
+   breakpoint, pin them to the visible screen instead, stacked above
+   the mobile bottom bar in their desktop order (toggle above button).
+   Desktop geometry untouched. */
+@media (max-width: 950px){
+  #hw70-ui > #hw58-piano-btn{ position:fixed !important; right:12px !important; bottom:118px !important; }
+  #hw70-ui > #hw88-piano-toggle{ position:fixed !important; right:12px !important; bottom:152px !important; }
+}
+</style>
 </body>
 </html>
