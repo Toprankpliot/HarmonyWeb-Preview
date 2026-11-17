@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://harmonywebv12.netlify.app/sitemap.xml
