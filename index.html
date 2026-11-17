@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v202) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v203) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -41992,5 +41992,219 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   #hw70-ui > #hw88-piano-toggle{ position:fixed !important; right:12px !important; bottom:152px !important; }
 }
 </style>
+
+<script id="hw203-js">
+/* ===== hw203 (v203) — deep MIDI chord identification =====
+   Replaces the 19-entry recognizer with a feature-based engine: for every
+   candidate root it reads the held pitch classes as chord features (3rd,
+   5th state, 7th/6th, 9/11/13, alterations) and builds the most specific
+   standard name — any inversion, extensions, alterations, rootless
+   voicings, slash bass. Also drives the web node for out-of-key chords
+   whose root+family exists in the web. Kill: window._hw203off = true. */
+(function(){
+  if (window._hw203) return;
+  var FL = '\u266d', SH = '\u266f';
+  function nm(pc){ try { return _pcName(pc); } catch(e){ return NOTE_NAMES[pc]; } }
+
+  function read(rel){
+    var h = function(iv){ return rel.has(iv); };
+    var R = h(0), m3 = h(3), M3 = h(4), P4 = h(5), d5 = h(6), P5 = h(7), a5 = h(8),
+        SIX = h(9), m7 = h(10), M7 = h(11), NINE = h(2), B9 = h(1);
+    var S9 = m3 && M3;    /* interval 3 beside a major 3rd = #9 */
+    var S11 = d5 && P5;   /* interval 6 beside a perfect 5th = #11 */
+    var ex = new Set(); if (R) ex.add(0);
+    var name = null, shell = false, alts = 0;
+    function take(){ for (var i = 0; i < arguments.length; i++) ex.add(arguments[i]); }
+    function fin(){ return { name: name, explained: ex, shell: shell, alts: alts }; }
+
+    if (m3 && d5 && !M3){
+      take(3, 6);
+      if (h(9) && !m7){ name = 'dim7'; take(9); }
+      else if (m7){ name = 'm7' + FL + '5'; take(10); shell = true;
+        if (NINE){ name = 'm9' + FL + '5'; take(2); }
+        if (P4){ name += '(11)'; take(5); } }
+      else name = 'dim';
+      return fin();
+    }
+    if (m3 && !M3){
+      take(3); if (P5) take(7);
+      if (M7){ shell = true; take(11); name = NINE ? 'mMaj9' : 'mMaj7'; if (NINE) take(2); if (SIX){ name += '(13)'; take(9); } }
+      else if (m7){ shell = true; take(10);
+        if (NINE && SIX){ name = 'm13'; take(2, 9); if (P4) take(5); }
+        else if (NINE && P4){ name = 'm11'; take(2, 5); }
+        else if (NINE){ name = 'm9'; take(2); }
+        else if (SIX){ name = 'm7(13)'; take(9); }
+        else if (P4){ name = 'm7(11)'; take(5); }
+        else name = 'm7';
+        if (S11 && !P4){ name += '(' + SH + '11)'; take(6); alts++; }
+      }
+      else if (SIX){ name = NINE ? 'm6/9' : 'm6'; take(9); if (NINE) take(2); }
+      else { name = 'm'; if (NINE){ name = 'm(add9)'; take(2); } if (P4){ take(5); name = NINE ? 'm(add9,11)' : 'm(add11)'; } }
+      return fin();
+    }
+    if (M3){
+      take(4);
+      if (a5 && !P5 && !m7 && !M7){ name = 'aug'; take(8); if (NINE) take(2); return fin(); }
+      if (a5 && !P5 && M7 && !m7){ name = 'maj7' + SH + '5'; take(8, 11); shell = true; if (NINE){ name += '(9)'; take(2); } return fin(); }
+      if (P5) take(7);
+      var b5 = d5 && !P5;
+      if (m7){
+        shell = true; take(10);
+        var base;
+        if (SIX){ base = '13'; take(9); if (NINE) take(2); if (P4) take(5); }
+        else if (P4){ base = '11'; take(5); if (NINE) take(2); }
+        else if (NINE){ base = '9'; take(2); }
+        else base = '7';
+        if (b5){ base = '7' + FL + '5'; take(6); if (NINE) take(2); }
+        var altList = [];
+        if (B9){ altList.push(FL + '9'); take(1); }
+        if (S9){ altList.push(SH + '9'); take(3); }
+        if (S11){ altList.push(SH + '11'); take(6); }
+        var b13 = false;
+        if (a5){
+          if (!P5 && !(NINE || SIX || B9 || S9 || P4) && base === '7' && !b5){ name = '7' + SH + '5'; take(8); return fin(); }
+          b13 = true; take(8);
+        }
+        if (b13) altList.push(FL + '13');
+        alts = altList.length;
+        if ((B9 || S9) && b13 && !NINE && !P4 && !SIX && base === '7'){ name = '7alt'; return fin(); }
+        name = base + (altList.length ? (base === '7' && altList.length === 1 ? altList[0] : '(' + altList.join(',') + ')') : '');
+        return fin();
+      }
+      if (M7){
+        shell = true; take(11);
+        if (NINE && SIX){ name = 'maj13'; take(2, 9); if (P4) take(5); }
+        else if (NINE){ name = 'maj9'; take(2); if (P4){ name += '(11)'; take(5); } }
+        else if (SIX){ name = 'maj7(13)'; take(9); }
+        else if (P4){ name = 'maj7(11)'; take(5); }
+        else name = 'maj7';
+        if (b5){ name = 'maj7' + FL + '5'; take(6); if (NINE) take(2); }
+        if (S11){ name += SH + '11'; take(6); }
+        if (a5 && P5){ name += '(' + FL + '13)'; take(8); alts++; }
+        if (B9){ name += '(' + FL + '9)'; take(1); alts++; }
+        return fin();
+      }
+      if (SIX){ name = NINE ? '6/9' : '6'; take(9); if (NINE) take(2); return fin(); }
+      name = '';
+      if (NINE){ name = 'add9'; take(2); }
+      if (P4){ name = NINE ? 'add9(11)' : '(add11)'; take(5); }
+      if (b5){ name = '(' + FL + '5)'; take(6); }
+      return fin();
+    }
+    if (P4){
+      take(5); if (P5) take(7);
+      if (m7){ take(10);
+        if (NINE && SIX){ name = '13sus4'; take(2, 9); }
+        else if (NINE){ name = '9sus4'; take(2); }
+        else if (SIX){ name = '13sus4'; take(9); }
+        else name = '7sus4';
+      } else if (M7){ name = 'maj7sus4'; take(11); if (NINE) take(2); }
+      else if (SIX){ name = '6sus4'; take(9); }
+      else { name = 'sus4'; if (NINE){ name = 'sus4(add9)'; take(2); } }
+      return fin();
+    }
+    if (NINE){ take(2); if (P5) take(7); name = m7 ? (take(10), '7sus2') : 'sus2'; return fin(); }
+    if (P5 && m7){ name = '7(no3)'; take(7, 10); return fin(); }
+    if (P5 && M7){ name = 'maj7(no3)'; take(7, 11); return fin(); }
+    if (P5 && SIX){ name = '6(no3)'; take(7, 9); return fin(); }
+    return null;
+  }
+
+  function identify(notes){
+    if (!notes || notes.size < 2) return null;
+    var arr = [...notes].sort(function(a, b){ return a - b; });
+    var bassPc = arr[0] % 12;
+    var pcs = [...new Set(arr.map(function(n){ return n % 12; }))];
+    if (pcs.length === 2){
+      var root = null;
+      if ((pcs[1] - pcs[0] + 12) % 12 === 7) root = pcs[0];
+      else if ((pcs[0] - pcs[1] + 12) % 12 === 7) root = pcs[1];
+      if (root === null) return null;
+      return { label: nm(root) + '5' + (bassPc !== root ? '/' + nm(bassPc) : ''), exact: true,
+               matched: 2, total: 2, root: root, name: '5', bassPc: bassPc, hw203: true };
+    }
+    var best = null;
+    for (var r = 0; r < 12; r++){
+      var rel = new Set(pcs.map(function(p){ return (p - r + 12) % 12; }));
+      var rd = read(rel); if (!rd || rd.name === null) continue;
+      var unexpl = 0; rel.forEach(function(iv){ if (!rd.explained.has(iv)) unexpl++; });
+      if (pcs.length === 3 && unexpl > 0) continue;
+      var explHeld = 0; rd.explained.forEach(function(iv){ if (rel.has(iv)) explHeld++; });
+      var score = explHeld * 3 - unexpl * 5;
+      if (rd.shell) score += 4;
+      if (bassPc === r) score += 6; else if (rd.explained.has((bassPc - r + 12) % 12)) score += 2;
+      if (rel.has(0)) score += 2; else score -= 2;
+      score -= (rd.alts || 0);
+      var tie = (bassPc - r + 12) % 12;
+      if (!best || score > best.score || (score === best.score && tie < best.tie))
+        best = { root: r, name: rd.name, score: score, tie: tie, unexpl: unexpl, explHeld: explHeld };
+    }
+    if (!best) return null;
+    if (!(best.unexpl === 0 || (pcs.length >= 4 && best.unexpl <= 1 && best.score >= 14))) return null;
+    return { label: nm(best.root) + best.name + (bassPc !== best.root ? '/' + nm(bassPc) : ''),
+             exact: best.unexpl === 0, matched: best.explHeld, total: pcs.length,
+             root: best.root, name: best.name, bassPc: bassPc, hw203: true };
+  }
+
+  function familyOf(name){
+    if (/^dim7/.test(name)) return ['dim7', 'dim'];
+    if (/^dim/.test(name)) return ['dim', 'dim7'];
+    if (/m7\u266d5|m9\u266d5/.test(name)) return ['dim', 'ext', 'minor'];
+    if (/^aug|\u266f5/.test(name)) return ['aug', 'ext'];
+    if (/sus/.test(name)) return ['sus', 'dom7', 'ext'];
+    if (/\(no3\)/.test(name)) return ['dom7', 'major', 'ext'];
+    if (/^m/.test(name)) return ['minor', 'ext'];
+    if (/^[0-9]|^7alt/.test(name)) return ['dom7', 'ext'];
+    if (name === '5') return ['major', 'minor', 'dom7', 'ext'];
+    return ['major', 'ext'];
+  }
+  function findNode(rec, heldPcs){
+    var fams = familyOf(rec.name), best = null, bs = -99;
+    for (var i = 0; i < chords.length; i++){
+      var c = chords[i];
+      if (c.rpc !== rec.root || !c.nidxs || fams.indexOf(c.type) < 0) continue;
+      if (typeof MUTED_TYPES !== 'undefined' && MUTED_TYPES.has(c.type)) continue;
+      var ov = c.nidxs.filter(function(p){ return heldPcs.has(p); }).length;
+      var sc = ov * 2 - (c.nidxs.length - ov);
+      if (ov >= 2 && sc > bs){ bs = sc; best = c; }
+    }
+    return best;
+  }
+
+  var origRec = (typeof _recognizeChord === 'function') ? _recognizeChord : null;
+  _recognizeChord = function(midiNotes){
+    if (!window._hw203off){ try { var r = identify(midiNotes); if (r) return r; } catch(e){} }
+    return origRec ? origRec(midiNotes) : null;
+  };
+
+  var origTry = tryMatchChord;
+  tryMatchChord = function(){
+    origTry();
+    if (window._hw203off) return;
+    try {
+      if (!midiNotesDown || midiNotesDown.size < 2) return;
+      var rec = identify(midiNotesDown); if (!rec) return;
+      var heldPcs = new Set([...midiNotesDown].map(function(n){ return n % 12; }));
+      if (lastMatchedNode){
+        var ns = new Set(lastMatchedNode.nidxs || []);
+        var isExact = ns.size === heldPcs.size && [...ns].every(function(p){ return heldPcs.has(p); });
+        if (isExact){ if (lastMatchedNode.rpc === rec.root) setMidiMatch('\u25c8 ' + rec.label + ' \u2014 matched!'); return; }
+        if (lastMatchedNode.rpc === rec.root){ setMidiMatch('\u25c8 ' + rec.label); return; }
+      }
+      var node = findNode(rec, heldPcs);
+      if (node){
+        clearMidiPartialMatches();
+        document.querySelectorAll('.midi-suggest').forEach(function(el){ el.classList.remove('midi-suggest'); });
+        clearMidiNodeMatch();
+        lastMatchedNode = node;
+        midiActivateNode(node);
+      }
+      setMidiMatch('\u25c8 ' + rec.label);
+    } catch(e){}
+  };
+
+  window._hw203 = { identify: identify, version: 'v203' };
+})();
+</script>
 </body>
 </html>
