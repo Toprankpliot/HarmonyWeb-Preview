@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v202</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v204</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v203) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v204) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42204,6 +42204,125 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   };
 
   window._hw203 = { identify: identify, version: 'v203' };
+})();
+</script>
+
+<style id="hw204-css">
+/* hw204: satellite (outside) chords render as pills — name + notes + family colour */
+.node.hw204-pill{ width:auto !important; height:37px !important; border-radius:999px !important;
+  padding:2px 12px !important; display:flex !important; flex-direction:column; align-items:center;
+  justify-content:center; background:rgba(9,13,19,0.93) !important; line-height:1.15 !important;
+  box-shadow:0 2px 10px rgba(0,0,0,0.45); }
+.node.hw204-pill .node-main{ font-size:12.5px !important; white-space:nowrap; }
+.node.hw204-pill .node-roman{ display:none !important; }
+.node.hw204-pill .hw204-notes{ font-size:9.5px; color:rgba(235,240,248,0.66); letter-spacing:0.02em; white-space:nowrap; }
+</style>
+<script id="hw204-js">
+/* ===== hw204 (v204) — outside chords as clickable tree pills =====
+   Every non-ring chord on the web becomes a pill: proper name, its notes,
+   its family colour (the app's own border/text colour). Pills stay grouped
+   by the app's parent-ray seating (the tree), remain clickable/draggable,
+   and a box relaxer de-overlaps pill rectangles after each seat, syncing
+   positions + _hw44Last so the app accepts the result.
+   Kill/restore: window._hw204.restore(). */
+(function(){
+  if (window._hw204) return;
+  var scheduled = null, relaxing = false;
+
+  function isSat(ch, el){
+    if (!el || el.classList.contains('hw36-off')) return false;
+    try { return window.hw36Bucket && window.hw36Bucket(ch) !== 'ring'; } catch(e){ return el.classList.contains('hw49-sat'); }
+  }
+  function decorate(){
+    if (window._hw204off) return;
+    chords.forEach(function(ch){
+      var el = nodeEls[ch.id]; if (!el || !isSat(ch, el)) return;
+      el.classList.add('hw204-pill');
+      if (!el.querySelector('.hw204-notes')){
+        var s = document.createElement('div'); s.className = 'hw204-notes';
+        s.textContent = (ch.notes || []).join('\u00b7');
+        el.appendChild(s);
+      }
+    });
+  }
+  function relax(){
+    if (relaxing || window._hw204off) return;
+    if (window._hw41MouseDown) { schedule(700); return; }
+    var wa = document.getElementById('web-area'); if (!wa) return;
+    var g = window._hw18Geo; if (!g) return;
+    var W = wa.clientWidth, H = wa.clientHeight, cx = g.cx, cy = g.cy, tickR = g.R * 1.22;
+    var items = [], ringObs = [];
+    chords.forEach(function(ch){
+      var el = nodeEls[ch.id]; if (!el) return;
+      var p = positions[ch.id]; if (!p) return;
+      if (isSat(ch, el)){
+        items.push({ id: ch.id, el: el, x: p.x, y: p.y, ax: p.x, ay: p.y,
+                     w: el.offsetWidth, h: el.offsetHeight,
+                     fixed: !!(window._hwFreePos && window._hwFreePos[ch.id]) });
+      } else if (!el.classList.contains('hw36-off')){
+        ringObs.push({ x: p.x, y: p.y, r: el.offsetWidth / 2 });
+      }
+    });
+    if (!items.length) return;
+    relaxing = true;
+    for (var it = 0; it < 280; it++){
+      var i, j, t, a, b, dx, dy, ox, oy, mx, my, aM, bM;
+      for (i = 0; i < items.length; i++){ t = items[i]; if (!t.fixed){ t.x += (t.ax - t.x) * 0.012; t.y += (t.ay - t.y) * 0.012; } }
+      for (i = 0; i < items.length; i++) for (j = i + 1; j < items.length; j++){
+        a = items[i]; b = items[j];
+        dx = b.x - a.x; dy = b.y - a.y;
+        ox = (a.w + b.w) / 2 + 3 - Math.abs(dx); oy = (a.h + b.h) / 2 + 3 - Math.abs(dy);
+        if (ox <= 0 || oy <= 0) continue;
+        mx = 0; my = 0;
+        if (ox < oy) mx = ox * (dx >= 0 ? 1 : -1); else my = oy * (dy >= 0 ? 1 : -1);
+        aM = a.fixed ? 0 : (b.fixed ? 1 : 0.5); bM = b.fixed ? 0 : (a.fixed ? 1 : 0.5);
+        a.x -= mx * aM; a.y -= my * aM; b.x += mx * bM; b.y += my * bM;
+      }
+      for (i = 0; i < items.length; i++){
+        t = items[i]; if (t.fixed) continue;
+        dx = t.x - cx; dy = t.y - cy;
+        var d = Math.hypot(dx, dy) || 1, minD = tickR + Math.max(t.w, t.h) / 2 + 8;
+        if (d < minD){ t.x = cx + dx / d * minD; t.y = cy + dy / d * minD; }
+        for (j = 0; j < ringObs.length; j++){
+          var ro = ringObs[j];
+          dx = t.x - ro.x; dy = t.y - ro.y; d = Math.hypot(dx, dy) || 1;
+          minD = ro.r + Math.max(t.w, t.h) / 2 + 4;
+          if (d < minD){ t.x = ro.x + dx / d * minD; t.y = ro.y + dy / d * minD; }
+        }
+        t.x = Math.max(t.w / 2 + 4, Math.min(W - t.w / 2 - 4, t.x));
+        t.y = Math.max(t.h / 2 + 4, Math.min(H - t.h / 2 - 4, t.y));
+      }
+    }
+    items.forEach(function(t){
+      if (t.fixed) return;
+      if (Math.abs(t.x - t.ax) < 0.6 && Math.abs(t.y - t.ay) < 0.6) return;
+      positions[t.id].x = t.x; positions[t.id].y = t.y;
+      t.el.style.left = t.x + 'px'; t.el.style.top = t.y + 'px';
+      if (window._hw44Last) window._hw44Last[t.id] = [t.x, t.y];
+    });
+    relaxing = false;
+  }
+  function schedule(ms){
+    if (window._hw204off) return;
+    clearTimeout(scheduled);
+    scheduled = setTimeout(function(){ decorate(); relax(); }, ms || 900);
+  }
+  var origLoad = loadKey;
+  loadKey = function(){ var r = origLoad.apply(this, arguments); schedule(1100); return r; };
+  if (typeof window.hw38Seat === 'function'){
+    var origSeat = window.hw38Seat;
+    window.hw38Seat = function(){ var r = origSeat.apply(this, arguments); schedule(1100); return r; };
+  }
+  setInterval(function(){ if (!window._hw204off) decorate(); }, 2500);
+  schedule(1600);
+  window._hw204 = { decorate: decorate, relax: relax, version: 'v204',
+    restore: function(){
+      window._hw204off = true;
+      document.querySelectorAll('.hw204-pill').forEach(function(el){ el.classList.remove('hw204-pill'); });
+      document.querySelectorAll('.hw204-notes').forEach(function(el){ el.remove(); });
+      var st = document.getElementById('hw204-css'); if (st) st.remove();
+      if (typeof window.hw38Seat === 'function') window.hw38Seat(false);
+    } };
 })();
 </script>
 </body>
