@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v209</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v210</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v209) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v210) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42857,11 +42857,13 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
    4) The image's one-line ID — "Em · degree 3 · iii · Tonic · Wistful ·
       E – G – B" — as the TOP line of the existing tooltip card (the rest of
       the card is untouched).
-   5) Voice-leading badge: when a chord is selected, each flashing resolve
-      target (hw201's set) wears a small badge = total semitone movement of
-      the smoothest voice leading between the two chords. Lower = smoother.
-      Badges ride hw201's start/stop flow hooks, so they live and die with
-      the flashes. No lines were brought back (his v201 order stands). */
+   5) Corner badge: when a chord is selected, each flashing resolve target
+      (hw201's set) wears a small badge = how many notes the two chords
+      SHARE (common tones). It first shipped as total semitone movement;
+      he asked what the number meant, said "replace it", and picked the
+      shared-notes count himself (2026-11-22). Badges ride hw201's
+      start/stop flow hooks, so they live and die with the flashes.
+      No lines were brought back (his v201 order stands). */
 (function(){
   if (window._hw208) return;
   var MOODS = ['Bright home', 'Gentle', 'Wistful', 'Warm open', 'Triumphant', 'Sad reflective', 'Restless'];
@@ -43007,11 +43009,14 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
       }catch(e){}
       var el = document.querySelector('.node[data-chord-id="' + tid + '"]');
       if (!el) return;
-      var cost = vlCost(from, to);
-      if (cost == null) return;
+      var aPcs = pcsOf(from), bPcs = pcsOf(to);
+      var shared = aPcs.filter(function(p){ return bPcs.indexOf(p) >= 0; });
       var b = document.createElement('span'); b.className = 'hw208-badge';
-      b.textContent = cost;
-      b.title = 'Voice leading to ' + (to.label || tid) + ': ' + cost + ' semitones of movement (lower = smoother)';
+      b.textContent = shared.length;
+      b.title = shared.length
+        ? 'Shares ' + shared.length + ' note' + (shared.length > 1 ? 's' : '') + ' with ' + (from.label || from.id) + ': ' +
+          shared.map(function(p){ var i = aPcs.indexOf(p); return (from.notes || [])[i] || p; }).join(' · ')
+        : 'No shared notes with ' + (from.label || from.id);
       el.appendChild(b);
     });
   }
@@ -43037,7 +43042,8 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   }, 1300);
   setTimeout(decorate, 1600);
 
-  window._hw208 = { version: 'v208', decorate: decorate, vlCost: vlCost, setBadges: setBadges, clearBadges: clearBadges };
+  window._hw208 = { version: 'v210', decorate: decorate, vlCost: vlCost, setBadges: setBadges, clearBadges: clearBadges,
+    sharedCount: function(a, b){ var B = pcsOf(b); return pcsOf(a).filter(function(p){ return B.indexOf(p) >= 0; }).length; } };
 })();
 </script>
 </body>
