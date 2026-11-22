@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v204</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v205</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v204) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v205) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42323,6 +42323,61 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
       var st = document.getElementById('hw204-css'); if (st) st.remove();
       if (typeof window.hw38Seat === 'function') window.hw38Seat(false);
     } };
+})();
+</script>
+
+<style id="hw205-css">
+/* v205: no ring/circle floating around the pills (the node's ::before halo is
+   a circle meant for round nodes — on a pill it reads as a stray oval ring) */
+.node.hw204-pill::before{ content:none!important; display:none!important; }
+</style>
+<script id="hw205-js">
+/* ═══ hw205 — CHORD IDENTITY + TRUE INVERSIONS ═══
+   Bug (his report, proven by capture): every G-rooted dominant — G7, G9, G13,
+   G7b9, G7#9, G7#5 — played the IDENTICAL grip stack {G,B,F,A,E}: the voicing
+   engine built notes from the chord TYPE template and erased the chord's own
+   alterations/extensions. Inversions rotated that same template (rebuilt from
+   octave 3), so they blurred together too, and the piano lit the template's
+   keys — wrong shapes.
+   Fix 1: _getVoicingFreqs is guarded — if the styled voicing would DROP a
+   defining tone of the chord's real pitch set (b9, #9, 3rd, sus tone, b5/#11,
+   #5/b13, b7, maj7) or ADD a 3rd to a sus chord, the chord's OWN stack
+   (ch.freqs) plays instead. Plain chords keep their grips/voicings.
+   Fix 2: buildInversionFreqs takes the root-position voicing (identity-aware
+   via fix 1) and rotates it properly — lowest note up an octave — so each
+   inversion has its real bass, in sound AND on the piano (showPiano and the
+   right-panel inversion labels read the same function). */
+(function(){
+  if (window._hw205) return;
+  var DEF = { '1':1, '3':1, '4':1, '5':1, '6':1, '8':1, '10':1, '11':1 };
+  function rel(n, root){ return (((n - root) % 12) + 12) % 12; }
+  function violated(ch, inner){
+    if (!ch || !ch.freqs || ch.freqs.length < 3 || !ch.nidxs || ch.nidxs.length < 3) return false;
+    if (!inner || !inner.length) return false;
+    var root = (ch.rpc != null ? ch.rpc : ch.nidxs[0]);
+    var S = {}, T = {};
+    ch.nidxs.forEach(function(n){ S[rel(n, root)] = 1; });
+    inner.forEach(function(nf){ var pc = (typeof NOTE_NAMES !== 'undefined') ? NOTE_NAMES.indexOf(nf[0]) : -1; if (pc >= 0) T[rel(pc, root)] = 1; });
+    for (var d in DEF){ if (S[d] && !T[d]) return true; }
+    if (!S[3] && !S[4] && (S[2] || S[5]) && (T[3] || T[4])) return true; // sus chord handed a 3rd
+    return false;
+  }
+  var _gvf = _getVoicingFreqs;
+  _getVoicingFreqs = function(ch, styleName){
+    var inner = _gvf(ch, styleName);
+    if (violated(ch, inner)) return ch.freqs.map(function(nf){ return [nf[0], nf[1]]; });
+    return inner;
+  };
+  var _bif = buildInversionFreqs;
+  buildInversionFreqs = function(ch, inv){
+    var base = _bif(ch, 0);
+    if (!base || !base.length) return base;
+    var out = base.map(function(nf){ return [nf[0], nf[1]]; });
+    var k = Math.min(Math.max(0, inv || 0), out.length - 1);
+    for (var i = 0; i < k; i++){ var f = out.shift(); out.push([f[0], Math.min(7, f[1] + 1)]); }
+    return out;
+  };
+  window._hw205 = { version: 'v205', violated: violated };
 })();
 </script>
 </body>
