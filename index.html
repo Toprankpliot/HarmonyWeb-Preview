@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v205</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v207</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v205) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v207) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42378,6 +42378,280 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
     return out;
   };
   window._hw205 = { version: 'v205', violated: violated };
+})();
+</script>
+
+<script id="hw206-js">
+/* ═══ hw206 — EVERY CHORD IS ITSELF (set-exact voicings) ═══
+   His follow-up, verbatim case: "C5 and C sound the same and show the same
+   notes on the piano." Cause: hw205's guard only fired when a voicing DROPPED
+   a defining tone of an altered/extended chord — but the type templates also
+   ADD tones: C5 (a 2-note power chord, skipped by the old <3-note guard) was
+   routed to the MAJOR template and gained a 3rd, so C5 literally played as C.
+   Rule now, for every chord with no exceptions: a voicing style may only
+   REARRANGE the chord's own pitch classes — never add, never erase.
+   Implementation: the styled voicing is filtered to the chord's own pc set
+   (keeping the style's order/spacing/register), and any chord tone the style
+   left out is appended from the chord's own stack. Sound, piano shape and
+   panel labels all read this path, so what you hear is the chord you tapped. */
+(function(){
+  if (window._hw206) return;
+  var RESPELL = { 'Db':'C#', 'Eb':'D#', 'Gb':'F#', 'Ab':'G#', 'Bb':'A#', 'Cb':'B', 'Fb':'E', 'B#':'C', 'E#':'F' };
+  var RESPELL_OCT = { 'Cb':-1, 'B#':1 };
+  function pcOf(name){ var n = RESPELL[name] || name; return (typeof NOTE_NAMES !== 'undefined') ? NOTE_NAMES.indexOf(n) : -1; }
+  function respell(freqs){
+    if (!freqs) return freqs;
+    return freqs.map(function(nf){
+      var r = RESPELL[nf[0]];
+      return r ? [r, nf[1] + (RESPELL_OCT[nf[0]] || 0)] : [nf[0], nf[1]];
+    });
+  }
+  var _gvf = _getVoicingFreqs;
+  _getVoicingFreqs = function(ch, styleName){
+    var inner = _gvf(ch, styleName);
+    try{
+      if (!ch || !ch.nidxs || !ch.nidxs.length || !inner || !inner.length) return inner;
+      var root = (ch.rpc != null ? ch.rpc : ch.nidxs[0]);
+      var S = {};
+      ch.nidxs.forEach(function(n){ S[(((n - root) % 12) + 12) % 12] = 1; });
+      var have = {}, kept = [];
+      inner.forEach(function(nf){
+        var pc = pcOf(nf[0]); if (pc < 0) return;
+        var rel = (((pc - root) % 12) + 12) % 12;
+        if (S[rel]){ kept.push([nf[0], nf[1]]); have[rel] = 1; }
+      });
+      (ch.freqs || []).forEach(function(nf){
+        var pc = pcOf(nf[0]); if (pc < 0) return;
+        var rel = (((pc - root) % 12) + 12) % 12;
+        if (S[rel] && !have[rel]){ kept.push([nf[0], nf[1]]); have[rel] = 1; }
+      });
+      // Still missing a tone of the chord's own definition (e.g. tritone-sub
+      // shells store only root/3rd/b7 in freqs)? Synthesize it from nidxs in
+      // the chord's own spelling, seated inside the stack's span.
+      var missing = [];
+      ch.nidxs.forEach(function(n, idx){ var rel = (((n - root) % 12) + 12) % 12; if (!have[rel]) missing.push({ rel: rel, idx: idx }); });
+      if (missing.length && kept.length){
+        var midis = kept.map(function(nf){ return (nf[1] + 1) * 12 + pcOf(nf[0]); });
+        var lo = Math.min.apply(null, midis), hi = Math.max.apply(null, midis);
+        var rootEntry = kept.filter(function(nf){ return (((pcOf(nf[0]) - root) % 12) + 12) % 12 === 0; })[0] || kept[0];
+        var rootMidi = (rootEntry[1] + 1) * 12 + pcOf(rootEntry[0]);
+        missing.forEach(function(m){
+          var cand = rootMidi + m.rel;
+          while (cand < lo) cand += 12;
+          while (cand > hi + 11) cand -= 12;
+          var nm = (ch.notes && ch.notes[m.idx]) || NOTE_NAMES[(((root + m.rel) % 12) + 12) % 12];
+          kept.push([nm, Math.floor(cand / 12) - 1, cand]);
+          have[m.rel] = 1;
+        });
+        kept.sort(function(a, b){ return ((a[2] != null ? a[2] : (a[1] + 1) * 12 + pcOf(a[0]))) - ((b[2] != null ? b[2] : (b[1] + 1) * 12 + pcOf(b[0]))); });
+        kept = kept.map(function(nf){ return [nf[0], nf[1]]; });
+      }
+      return respell(kept.length ? kept : inner);
+    }catch(e){ return inner; }
+  };
+  // The standard-style path bypasses _getVoicingFreqs (it rotates ch.freqs
+  // directly, flat spellings and all) — respell buildInversionFreqs' result
+  // too, so every route into the speakers is engine-safe.
+  var _bif2 = buildInversionFreqs;
+  buildInversionFreqs = function(ch, inv){
+    return respell(_bif2(ch, inv));
+  };
+  window._hw206 = { version: 'v206' };
+})();
+</script>
+
+<style id="hw207-css">
+#hw207-view{ position:absolute; inset:0; z-index:96; display:none; overflow:auto;
+  background:linear-gradient(180deg,#0a0f16 0%,#070a10 100%); padding:18px 20px 26px; }
+#hw207-view.open{ display:block; }
+#hw207-view .hw207-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+#hw207-view .hw207-title{ font-size:19px; font-weight:800; color:#e6c87a; letter-spacing:0.04em; }
+#hw207-view .hw207-key{ font-size:13px; color:rgba(235,240,248,0.75); }
+#hw207-view .hw207-close{ margin-left:auto; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.25);
+  border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+#hw207-view .hw207-how{ font-size:12.5px; line-height:1.55; color:rgba(235,240,248,0.66); max-width:860px; margin:4px 0 14px; }
+#hw207-view table{ border-collapse:separate; border-spacing:5px; margin:0 auto; }
+#hw207-view th, #hw207-view td{ text-align:center; }
+#hw207-view .hw207-rowlab{ font-size:12px; font-weight:700; color:#e6c87a; padding:0 8px 0 0; white-space:nowrap; }
+#hw207-view .hw207-collab{ font-size:12px; font-weight:700; color:rgba(235,240,248,0.6); padding:0 0 4px; }
+#hw207-view td.hw207-cell{ background:rgba(255,255,255,0.045); border:1px solid rgba(255,255,255,0.10); border-radius:9px;
+  padding:9px 0 7px; min-width:64px; cursor:pointer; }
+#hw207-view td.hw207-cell .n{ display:block; font-size:16.5px; font-weight:700; color:#eef2f8; }
+#hw207-view td.hw207-cell .d{ display:block; font-size:10px; color:rgba(235,240,248,0.45); margin-top:2px; }
+#hw207-view td.hw207-cell.hl{ background:rgba(230,200,122,0.13); border-color:rgba(230,200,122,0.55); }
+#hw207-view td.hw207-cell.rootcell{ box-shadow:inset 0 0 0 1.5px rgba(230,200,122,0.85); }
+#hw207-view .hw207-read{ margin:14px auto 0; max-width:860px; text-align:center; font-size:14px; color:rgba(235,240,248,0.85); }
+#hw207-view .hw207-read b{ color:#e6c87a; }
+#hw207-view .hw207-play{ margin-top:10px; background:rgba(230,200,122,0.14); color:#e6c87a; border:1px solid rgba(230,200,122,0.5);
+  border-radius:6px; padding:7px 18px; font-size:13.5px; cursor:pointer; font-family:inherit; }
+@media (max-width: 700px){ #hw207-view td.hw207-cell{ min-width:44px; } #hw207-view td.hw207-cell .n{ font-size:13.5px; } }
+</style>
+<script id="hw207-js">
+/* ═══ hw207 — SCALE STACKING (study table that takes over the web) ═══
+   His spec: write the same scale on several lines, each new line starting two
+   scale notes later (3rd, 5th, 7th, 9th, 11th, 13th), same scale throughout,
+   continuing into the next octave. Stack the rows, then read DOWN a column:
+   that column is the chord built in thirds on that scale degree, up to the
+   13th. The table follows the app's current key + scale; the highlighted
+   column is the chosen chord root (it follows the chord selected on the web;
+   click any column to choose it). The view clears the web while it is open —
+   a study surface, shown by itself. */
+(function(){
+  if (window._hw207) return;
+  var LETTERS = ['C','D','E','F','G','A','B'];
+  var LBASE = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  var RESPELL = { 'Db':'C#', 'Eb':'D#', 'Gb':'F#', 'Ab':'G#', 'Bb':'A#', 'Cb':'B', 'Fb':'E', 'B#':'C', 'E#':'F' };
+  var state = { col: 0, open: false };
+
+  function scaleData(){
+    var ivs = (typeof MODES !== 'undefined' && MODES[currentMode]) ? MODES[currentMode].intervals : [0,2,4,5,7,9,11];
+    var rootPc = ((currentRootIdx % 12) + 12) % 12;
+    var rootName = (typeof NOTE_NAMES_FLAT !== 'undefined' ? NOTE_NAMES_FLAT[rootPc] : NOTE_NAMES[rootPc]);
+    var startL = LETTERS.indexOf(rootName[0]);
+    var len = ivs.length;
+    function deg(d){ // unbounded scale degree -> {name, pc, midi}
+      var pc = (((rootPc + ivs[d % len] + 12 * Math.floor(d / len)) % 12) + 12) % 12;
+      var letter = LETTERS[(((startL + d) % 7) + 7) % 7];
+      var diff = (((pc - LBASE[letter]) % 12) + 12) % 12; if (diff > 6) diff -= 12;
+      var nm = letter + (diff > 0 ? '#'.repeat(diff) : diff < 0 ? 'b'.repeat(-diff) : '');
+      var midi = 48 + rootPc + ivs[d % len] + 12 * Math.floor(d / len);
+      return { name: nm, pc: pc, midi: midi };
+    }
+    return { ivs: ivs, rootPc: rootPc, rootName: rootName, len: len, deg: deg,
+             modeName: (MODES[currentMode] && MODES[currentMode].name) || currentMode };
+  }
+
+  function syncFromWeb(){
+    var before = state.col;
+    try{
+      if (typeof activeId !== 'undefined' && activeId){
+        var ch = chords.find(function(c){ return c.id === activeId; });
+        if (ch && ch.rpc != null){
+          var sd = scaleData();
+          var rel = (((ch.rpc - sd.rootPc) % 12) + 12) % 12;
+          var idx = sd.ivs.indexOf(rel);
+          if (idx >= 0) state.col = idx;
+        }
+      }
+    }catch(e){}
+    return state.col !== before;
+  }
+
+  function columnStack(sd, c){
+    var out = [];
+    for (var r = 0; r < sd.len; r++) out.push(sd.deg(c + 2 * r));
+    return out;
+  }
+
+  function playStack(sd, c){
+    var st = columnStack(sd, c);
+    var freqs = st.map(function(n){ var nm = RESPELL[n.name] || n.name; return [nm, Math.floor(n.midi / 12) - 1]; });
+    try{ if (typeof ensureAudioCtx === 'function') ensureAudioCtx();
+      if (typeof playChordFreqs === 'function') playChordFreqs(freqs, 'ext'); }catch(e){}
+  }
+
+  function render(){
+    var view = document.getElementById('hw207-view'); if (!view) return;
+    var sd = scaleData();
+    view.querySelector('.hw207-key').textContent = sd.rootName + ' ' + sd.modeName + ' — read down a column for the full chord, out to the 13th';
+    var tb = view.querySelector('tbody'); tb.innerHTML = '';
+    var head = view.querySelector('thead tr'); head.innerHTML = '<th></th>';
+    for (var c = 0; c < sd.len; c++){
+      var th = document.createElement('th'); th.className = 'hw207-collab';
+      th.textContent = (c + 1) + ' · ' + sd.deg(c).name; head.appendChild(th);
+    }
+    for (var r = 0; r < sd.len; r++){
+      var tr = document.createElement('tr');
+      var lab = document.createElement('td'); lab.className = 'hw207-rowlab';
+      lab.textContent = 'from ' + (2 * r + 1); tr.appendChild(lab);
+      for (var cc = 0; cc < sd.len; cc++){
+        (function(cc, d){
+          var cell = document.createElement('td');
+          cell.className = 'hw207-cell' + (cc === state.col ? ' hl' : '') + (d === cc ? ' rootcell' : '');
+          cell.innerHTML = '<span class="n"></span><span class="d"></span>';
+          cell.querySelector('.n').textContent = sd.deg(d).name;
+          cell.querySelector('.d').textContent = d + 1;
+          cell.title = 'Column ' + (cc + 1);
+          cell.addEventListener('click', function(){
+            if (state.col !== cc){ state.col = cc; render(); }
+            var n = sd.deg(d);
+            try{ if (typeof playTimbre === 'function') playTimbre(440 * Math.pow(2, (n.midi - 69) / 12), 0, 0.7, 0.22); }catch(e){}
+          });
+          tr.appendChild(cell);
+        })(cc, 2 * r + cc);
+      }
+      tb.appendChild(tr);
+    }
+    var st = columnStack(sd, state.col);
+    var names = st.map(function(n){ return n.name; }).join(' · ');
+    // The column's root is DEFINED (the degree) — name the stack from it
+    // directly. (The chord-ID engine guesses roots from pitch sets, and a
+    // full stack IS the whole scale set, so it would call a G13 column
+    // "Cmaj13". Root-true naming: quality from the stack's own 3rd/5th/7th.)
+    var rel = st.map(function(n){ return (((n.pc - st[0].pc) % 12) + 12) % 12; });
+    var top = 2 * sd.len - 1, t3 = rel[1], f5 = rel[2], s7 = rel[3], suf;
+    if (t3 === 3 && f5 === 6) suf = (s7 === 11) ? 'ø(maj' + top + ')' : 'ø' + top;
+    else if (t3 === 3) suf = (s7 === 11) ? 'm(maj' + top + ')' : 'm' + top;
+    else if (t3 === 4) suf = (s7 === 11) ? 'maj' + top : '' + top;
+    else suf = '' + top;
+    var label = st[0].name + suf;
+    view.querySelector('.hw207-read').innerHTML = '';
+    var b = document.createElement('b'); b.textContent = label;
+    view.querySelector('.hw207-read').appendChild(b);
+    view.querySelector('.hw207-read').appendChild(document.createTextNode(' — ' + names));
+    view.querySelector('.hw207-play').onclick = function(){ playStack(sd, state.col); };
+  }
+
+  function build(){
+    var wa = document.getElementById('web-area'); if (!wa) return false;
+    if (document.getElementById('hw207-view')) return true;
+    var view = document.createElement('div'); view.id = 'hw207-view';
+    view.innerHTML = '<div class="hw207-head"><span class="hw207-title">Scale Stacking</span>'
+      + '<span class="hw207-key"></span>'
+      + '<button class="hw207-close" type="button">✕ Back to Web</button></div>'
+      + '<div class="hw207-how">Write the same scale on several lines. Each new line starts two scale notes later — '
+      + 'the next line starts from its 3rd note, then the 5th, the 7th, the 9th, the 11th and the 13th — '
+      + 'staying in the same scale and continuing into the next octave. Stack the rows, then read down: '
+      + 'each column is the chord built in thirds on that degree, all the way out to the 13th. '
+      + 'The highlighted column is your chosen chord root. Tap a note to hear it; tap a column to choose it.</div>'
+      + '<table><thead><tr></tr></thead><tbody></tbody></table>'
+      + '<div class="hw207-read"></div>'
+      + '<div style="text-align:center"><button class="hw207-play" type="button">▶ Play this column</button></div>';
+    wa.appendChild(view);
+    view.querySelector('.hw207-close').addEventListener('click', function(){ toggle(false); });
+    return true;
+  }
+
+  function toggle(on){
+    if (!build()) return;
+    state.open = (on != null) ? on : !state.open;
+    if (state.open){ syncFromWeb(); render(); }
+    document.getElementById('hw207-view').classList.toggle('open', state.open);
+    if (state.open) setTimeout(function(){ var v = document.getElementById('hw207-view'); if (v) v.scrollIntoView({ block: 'start' }); }, 40);
+    var btn = document.getElementById('hw207-btn'); if (btn) btn.classList.toggle('on', state.open);
+  }
+
+  function mountBtn(){
+    if (document.getElementById('hw207-btn')) return;
+    var bar = document.getElementById('topbar'); if (!bar) return;
+    var btn = document.createElement('button');
+    btn.id = 'hw207-btn'; btn.className = 'tb-btn'; btn.type = 'button';
+    btn.innerHTML = '<span>▦ Stacking</span>';
+    btn.title = 'Scale Stacking — the study table';
+    btn.addEventListener('click', function(){ toggle(); });
+    var anchor = document.getElementById('tab-cof') || document.querySelector('#topbar .page-tab');
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+    else bar.appendChild(btn);
+  }
+
+  var _lk = loadKey;
+  loadKey = function(){ var r = _lk.apply(this, arguments); if (state.open) setTimeout(render, 350); return r; };
+  setInterval(function(){ if (state.open && syncFromWeb()) render(); }, 1200);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ build(); mountBtn(); });
+  else { build(); mountBtn(); }
+  setTimeout(function(){ build(); mountBtn(); }, 1500);
+
+  window._hw207 = { version: 'v207', toggle: toggle, render: render, state: state };
 })();
 </script>
 </body>
