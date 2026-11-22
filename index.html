@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v207</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v208</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v207) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v208) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42484,6 +42484,14 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
 #hw207-view .hw207-read b{ color:#e6c87a; }
 #hw207-view .hw207-play{ margin-top:10px; background:rgba(230,200,122,0.14); color:#e6c87a; border:1px solid rgba(230,200,122,0.5);
   border-radius:6px; padding:7px 18px; font-size:13.5px; cursor:pointer; font-family:inherit; }
+#hw207-view .hw207-ed{ max-width:860px; margin:12px auto 0; }
+#hw207-view .hw207-edrow{ display:flex; align-items:flex-start; gap:10px; margin-top:8px; }
+#hw207-view .hw207-edlab{ font-size:11px; font-weight:700; letter-spacing:0.08em; color:rgba(235,240,248,0.55); text-transform:uppercase; padding-top:6px; min-width:74px; text-align:right; }
+#hw207-view .hw207-chip{ background:rgba(255,255,255,0.06); border:1px solid rgba(230,200,122,0.45); color:#eef2f8; border-radius:999px; padding:4px 10px; font-size:13px; font-family:inherit; cursor:pointer; margin:0 4px 6px 0; }
+#hw207-view .hw207-chip i{ font-style:normal; color:#e6c87a; margin-left:6px; font-size:11px; }
+#hw207-view .hw207-chip.add{ border-style:dashed; border-color:rgba(255,255,255,0.3); color:rgba(235,240,248,0.85); }
+#hw207-view .hw207-chip.add i{ color:rgba(235,240,248,0.5); margin-left:5px; }
+#hw207-view .hw207-reset{ margin-top:10px; background:transparent; color:rgba(235,240,248,0.7); border:1px solid rgba(255,255,255,0.25); border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
 @media (max-width: 700px){ #hw207-view td.hw207-cell{ min-width:44px; } #hw207-view td.hw207-cell .n{ font-size:13.5px; } }
 </style>
 <script id="hw207-js">
@@ -42501,7 +42509,7 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   var LETTERS = ['C','D','E','F','G','A','B'];
   var LBASE = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
   var RESPELL = { 'Db':'C#', 'Eb':'D#', 'Gb':'F#', 'Ab':'G#', 'Bb':'A#', 'Cb':'B', 'Fb':'E', 'B#':'C', 'E#':'F' };
-  var state = { col: 0, open: false };
+  var state = { col: 0, open: false, added: [], removed: [], sig: '' };
 
   function scaleData(){
     var ivs = (typeof MODES !== 'undefined' && MODES[currentMode]) ? MODES[currentMode].intervals : [0,2,4,5,7,9,11];
@@ -42543,8 +42551,20 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
     return out;
   }
 
-  function playStack(sd, c){
-    var st = columnStack(sd, c);
+  var REL_LAB = { 0:'root', 1:'\u266d9', 2:'9', 3:'\u266f9', 4:'3', 5:'11', 6:'\u266f11', 7:'5', 8:'\u266d13', 9:'13', 10:'\u266d7', 11:'7' };
+  function currentStack(sd){
+    var base = columnStack(sd, state.col).filter(function(n){ return state.removed.indexOf(n.pc) < 0; });
+    var rootNote = columnStack(sd, state.col)[0];
+    var table = (sd.rootName.indexOf('b') >= 0 || sd.rootName === 'F') ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
+    var adds = state.added.map(function(pc){
+      var rel = (((pc - rootNote.pc) % 12) + 12) % 12;
+      return { name: table[pc], pc: pc, midi: rootNote.midi + rel, added: true };
+    });
+    return base.concat(adds).sort(function(a, b){ return a.midi - b.midi; });
+  }
+  function playStack(sd){
+    var st = currentStack(sd);
+    if (!st.length) return;
     var freqs = st.map(function(n){ var nm = RESPELL[n.name] || n.name; return [nm, Math.floor(n.midi / 12) - 1]; });
     try{ if (typeof ensureAudioCtx === 'function') ensureAudioCtx();
       if (typeof playChordFreqs === 'function') playChordFreqs(freqs, 'ext'); }catch(e){}
@@ -42553,6 +42573,8 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   function render(){
     var view = document.getElementById('hw207-view'); if (!view) return;
     var sd = scaleData();
+    var sig = sd.rootPc + '/' + currentMode + '/' + state.col;
+    if (sig !== state.sig){ state.added = []; state.removed = []; state.sig = sig; }
     view.querySelector('.hw207-key').textContent = sd.rootName + ' ' + sd.modeName + ' — read down a column for the full chord, out to the 13th';
     var tb = view.querySelector('tbody'); tb.innerHTML = '';
     var head = view.querySelector('thead tr'); head.innerHTML = '<th></th>';
@@ -42582,24 +42604,81 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
       }
       tb.appendChild(tr);
     }
-    var st = columnStack(sd, state.col);
+    var base = columnStack(sd, state.col);
+    var st = currentStack(sd);
+    var edited = state.added.length > 0 || state.removed.length > 0;
     var names = st.map(function(n){ return n.name; }).join(' · ');
-    // The column's root is DEFINED (the degree) — name the stack from it
-    // directly. (The chord-ID engine guesses roots from pitch sets, and a
-    // full stack IS the whole scale set, so it would call a G13 column
-    // "Cmaj13". Root-true naming: quality from the stack's own 3rd/5th/7th.)
-    var rel = st.map(function(n){ return (((n.pc - st[0].pc) % 12) + 12) % 12; });
-    var top = 2 * sd.len - 1, t3 = rel[1], f5 = rel[2], s7 = rel[3], suf;
-    if (t3 === 3 && f5 === 6) suf = (s7 === 11) ? 'ø(maj' + top + ')' : 'ø' + top;
-    else if (t3 === 3) suf = (s7 === 11) ? 'm(maj' + top + ')' : 'm' + top;
-    else if (t3 === 4) suf = (s7 === 11) ? 'maj' + top : '' + top;
-    else suf = '' + top;
-    var label = st[0].name + suf;
+    var label;
+    if (!edited){
+      // Pure column: the root is DEFINED (the degree) — name the stack from
+      // it directly. (The chord-ID engine guesses roots from pitch sets, and
+      // a full stack IS the whole scale set, so it would call a G13 column
+      // "Cmaj13". Root-true naming: quality from the stack's own 3rd/5th/7th.)
+      var rel = base.map(function(n){ return (((n.pc - base[0].pc) % 12) + 12) % 12; });
+      var top = 2 * sd.len - 1, t3 = rel[1], f5 = rel[2], s7 = rel[3], suf;
+      if (t3 === 3 && f5 === 6) suf = (s7 === 11) ? 'ø(maj' + top + ')' : 'ø' + top;
+      else if (t3 === 3) suf = (s7 === 11) ? 'm(maj' + top + ')' : 'm' + top;
+      else if (t3 === 4) suf = (s7 === 11) ? 'maj' + top : '' + top;
+      else suf = '' + top;
+      label = base[0].name + suf;
+    } else if (!st.length){
+      label = '(empty stack — add notes below)';
+    } else {
+      // Altered stack: let the chord-ID engine name it, but only trust the
+      // name when it keeps the column's root; otherwise spell the recipe.
+      label = null;
+      try{
+        if (window._hw203 && window._hw203.identify){
+          var rr = window._hw203.identify(st.map(function(n){ return n.pc; }), st[0].pc);
+          if (rr && rr.label && rr.root === base[0].pc && rr.label.indexOf('/') < 0) label = rr.label;
+        }
+      }catch(e){}
+      if (!label){
+        var ivs = st.map(function(n){ var r2 = (((n.pc - base[0].pc) % 12) + 12) % 12; return REL_LAB[r2] || ('' + r2); });
+        label = base[0].name + ': ' + ivs.join(' ');
+      }
+    }
     view.querySelector('.hw207-read').innerHTML = '';
     var b = document.createElement('b'); b.textContent = label;
     view.querySelector('.hw207-read').appendChild(b);
-    view.querySelector('.hw207-read').appendChild(document.createTextNode(' — ' + names));
-    view.querySelector('.hw207-play').onclick = function(){ playStack(sd, state.col); };
+    if (st.length) view.querySelector('.hw207-read').appendChild(document.createTextNode(' — ' + names));
+    view.querySelector('.hw207-play').onclick = function(){ playStack(sd); };
+    view.querySelector('.hw207-reset').onclick = function(){ state.added = []; state.removed = []; render(); };
+    // Editor chips — your stack (tap ✕ to take a note out) …
+    var chips = view.querySelector('.hw207-chips'); chips.innerHTML = '';
+    st.forEach(function(n){
+      var chip = document.createElement('button'); chip.type = 'button'; chip.className = 'hw207-chip';
+      chip.innerHTML = '<span></span><i>✕</i>';
+      chip.querySelector('span').textContent = n.name;
+      chip.title = 'Take ' + n.name + ' out of the stack';
+      chip.addEventListener('click', function(){
+        if (n.added) state.added = state.added.filter(function(p){ return p !== n.pc; });
+        else if (state.removed.indexOf(n.pc) < 0) state.removed.push(n.pc);
+        render(); playStack(sd);
+      });
+      chips.appendChild(chip);
+    });
+    // … and every note NOT in the stack (tap to put it in and hear it)
+    var adds = view.querySelector('.hw207-adds'); adds.innerHTML = '';
+    var inSet = {}; st.forEach(function(n){ inSet[n.pc] = true; });
+    var table2 = (sd.rootName.indexOf('b') >= 0 || sd.rootName === 'F') ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
+    for (var pc2 = 0; pc2 < 12; pc2++){
+      if (inSet[pc2]) continue;
+      (function(pc){
+        var rel2 = (((pc - base[0].pc) % 12) + 12) % 12;
+        var chip = document.createElement('button'); chip.type = 'button'; chip.className = 'hw207-chip add';
+        chip.innerHTML = '<span></span><i></i>';
+        chip.querySelector('span').textContent = table2[pc];
+        chip.querySelector('i').textContent = REL_LAB[rel2] || '';
+        chip.title = 'Add ' + table2[pc] + ' (' + (REL_LAB[rel2] || rel2) + ')';
+        chip.addEventListener('click', function(){
+          if (state.removed.indexOf(pc) >= 0) state.removed = state.removed.filter(function(p){ return p !== pc; });
+          else state.added.push(pc);
+          render(); playStack(sd);
+        });
+        adds.appendChild(chip);
+      })(pc2);
+    }
   }
 
   function build(){
@@ -42613,10 +42692,14 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
       + 'the next line starts from its 3rd note, then the 5th, the 7th, the 9th, the 11th and the 13th — '
       + 'staying in the same scale and continuing into the next octave. Stack the rows, then read down: '
       + 'each column is the chord built in thirds on that degree, all the way out to the 13th. '
-      + 'The highlighted column is your chosen chord root. Tap a note to hear it; tap a column to choose it.</div>'
+      + 'The highlighted column is your chosen chord root. Tap a note to hear it; tap a column to choose it. '
+      + 'Then make the chord yours: take notes out of the stack, or add alterations like \u266d9 and \u266f11 — you hear every change the moment you make it.</div>'
       + '<table><thead><tr></tr></thead><tbody></tbody></table>'
       + '<div class="hw207-read"></div>'
-      + '<div style="text-align:center"><button class="hw207-play" type="button">▶ Play this column</button></div>';
+      + '<div class="hw207-ed"><div class="hw207-edrow"><span class="hw207-edlab">Your stack</span><span class="hw207-chips"></span></div>'
+      + '<div class="hw207-edrow"><span class="hw207-edlab">Add</span><span class="hw207-adds"></span></div></div>'
+      + '<div style="text-align:center"><button class="hw207-play" type="button">▶ Play the stack</button> '
+      + '<button class="hw207-reset" type="button">Reset stack</button></div>';
     wa.appendChild(view);
     view.querySelector('.hw207-close').addEventListener('click', function(){ toggle(false); });
     return true;
@@ -42651,7 +42734,215 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   else { build(); mountBtn(); }
   setTimeout(function(){ build(); mountBtn(); }, 1500);
 
-  window._hw207 = { version: 'v207', toggle: toggle, render: render, state: state };
+  window._hw207 = { version: 'v208', toggle: toggle, render: render, state: state, currentStack: currentStack };
+})();
+</script>
+
+<style id="hw208-css">
+.hw208-meta{ display:block; text-align:center; line-height:1.2; pointer-events:none; margin-top:1px; }
+.hw208-fn{ display:block; font-size:8px; font-weight:700; letter-spacing:0.14em; }
+.hw208-mood{ display:block; font-size:8px; font-style:italic; opacity:0.68; color:rgba(235,240,248,0.9); }
+.node.sz-sm .hw208-fn{ font-size:7.5px; letter-spacing:0.05em; }
+.node.sz-xs .hw208-meta{ display:none; }
+.node.sz-sm .hw208-mood{ display:none; }
+.hw208-badge{ position:absolute; top:-7px; right:-7px; z-index:7; min-width:16px; height:16px; line-height:16px;
+  padding:0 3px; border-radius:999px; background:#0a0f16; border:1.5px solid #e6c87a; color:#e6c87a;
+  font-size:9.5px; font-weight:700; text-align:center; pointer-events:none; box-shadow:0 1px 6px rgba(0,0,0,0.6); }
+.hw204-pill .hw208-badge{ top:-6px; right:-6px; }
+#hw208-ttline{ font-size:11px; color:rgba(235,240,248,0.92); border-bottom:1px solid rgba(255,255,255,0.14);
+  padding-bottom:5px; margin-bottom:6px; line-height:1.5; }
+</style>
+<script id="hw208-js">
+/* ═══ hw208 — WEB IDEAS FROM HIS REFERENCE IMAGE (his pick: batch 1, 2, 4, 5) ═══
+   1) FUNCTION word inside every ring node (TONIC / SUBDOMINANT / DOMINANT),
+      coloured by the app's own chordFunction() groups.
+   2) MOOD word under it, per scale degree (from his image: iii = Wistful,
+      V = Triumphant, vi = Sad reflective...), quality-adjusted for degree 1.
+      Diatonic chords only — chromatic chords get no invented mood.
+   4) The image's one-line ID — "Em · degree 3 · iii · Tonic · Wistful ·
+      E – G – B" — as the TOP line of the existing tooltip card (the rest of
+      the card is untouched).
+   5) Voice-leading badge: when a chord is selected, each flashing resolve
+      target (hw201's set) wears a small badge = total semitone movement of
+      the smoothest voice leading between the two chords. Lower = smoother.
+      Badges ride hw201's start/stop flow hooks, so they live and die with
+      the flashes. No lines were brought back (his v201 order stands). */
+(function(){
+  if (window._hw208) return;
+  var MOODS = ['Bright home', 'Gentle', 'Wistful', 'Warm open', 'Triumphant', 'Sad reflective', 'Restless'];
+  var FN_LABEL = { tonic: 'Tonic', subdominant: 'Subdominant', dominant: 'Dominant' };
+
+  function degreeIdx(ch){
+    try{
+      var ivs = MODES[currentMode].intervals;
+      var rel = (((ch.rpc - currentRootIdx) % 12) + 12) % 12;
+      return ivs.indexOf(rel);
+    }catch(e){ return -1; }
+  }
+  function moodFor(ch){
+    var d = degreeIdx(ch);
+    if (d < 0 || d > 6) return null;
+    if (d === 0 && (ch.type === 'minor' || ch.type === 'min7' || ch.type === 'ext')) {
+      try{ if (MODES[currentMode].intervals[1] === 3 || ch.type === 'minor') return 'Solemn home'; }catch(e){}
+    }
+    if (d === 0 && ch.type === 'minor') return 'Solemn home';
+    if (d === 6 && ch.type !== 'dim' && ch.type !== 'dim7') return 'Tense';
+    return MOODS[d];
+  }
+  function fnGroup(ch){
+    try{ return (typeof chordFunction === 'function') ? chordFunction(ch) : null; }catch(e){ return null; }
+  }
+  function romanOf(ch){
+    try{ if (typeof getChordRomanLabel === 'function'){ var r = getChordRomanLabel(ch); if (r) return r; } }catch(e){}
+    try{ if (typeof getCRL === 'function'){ var r2 = getCRL(ch); if (r2) return r2; } }catch(e){}
+    return '';
+  }
+  function nameOf(ch){
+    try{ if (typeof _getVoicingChordName === 'function') return _getVoicingChordName(ch); }catch(e){}
+    return ch.label || ch.id;
+  }
+
+  /* ── 1 + 2: decorate ring nodes ── */
+  function decorate(){
+    document.querySelectorAll('.node[data-chord-id]').forEach(function(el){
+      if (el.querySelector('.hw208-meta')) return;
+      if (el.classList.contains('hw204-pill') || el.classList.contains('hw49-sat')) return;
+      var ch = null;
+      try{ ch = chords.find(function(c){ return c.id === el.dataset.chordId; }); }catch(e){}
+      if (!ch) return;
+      try{ if (typeof hw36Bucket === 'function' && hw36Bucket(ch) !== 'ring') return; }catch(e){}
+      var g = fnGroup(ch);
+      if (!g) return;
+      var meta = document.createElement('div'); meta.className = 'hw208-meta';
+      var fn = document.createElement('span'); fn.className = 'hw208-fn';
+      fn.textContent = (FN_LABEL[g.id] || g.label || '').toUpperCase();
+      fn.style.color = g.color || '';
+      meta.appendChild(fn);
+      var mood = moodFor(ch);
+      if (mood){
+        var ms = document.createElement('span'); ms.className = 'hw208-mood';
+        ms.textContent = mood; meta.appendChild(ms);
+      }
+      el.appendChild(meta);
+    });
+  }
+
+  /* ── 4: tooltip ID line ── */
+  var _origTT = (typeof showTooltip === 'function') ? showTooltip : null;
+  if (_origTT){
+    showTooltip = function(ch, nodeEl){
+      var r = _origTT.apply(this, arguments);
+      try{
+        var tip = document.getElementById('chord-tooltip');
+        if (tip && ch){
+          var line = document.getElementById('hw208-ttline');
+          if (!line){
+            line = document.createElement('div'); line.id = 'hw208-ttline';
+            tip.insertBefore(line, tip.firstChild);
+          }
+          var parts = [nameOf(ch)];
+          var d = degreeIdx(ch);
+          if (d >= 0) parts.push('degree ' + (d + 1));
+          var rom = romanOf(ch); if (rom) parts.push(rom);
+          var g = fnGroup(ch); if (g) parts.push(FN_LABEL[g.id] || g.label);
+          var mood = moodFor(ch); if (mood) parts.push(mood);
+          if (ch.notes && ch.notes.length) parts.push(ch.notes.join(' – '));
+          line.textContent = parts.join(' · ');
+        }
+      }catch(e){}
+      return r;
+    };
+  }
+
+  /* ── 5: voice-leading badges on resolve targets ── */
+  function pcsOf(ch){ return (ch.nidxs || []).map(function(p){ return ((p % 12) + 12) % 12; }); }
+  function nearestOctCost(aMidi, pc){
+    var best = 1e9;
+    [pc, pc + 12, pc - 12, pc + 24].forEach(function(off){
+      [48, 60].forEach(function(base){
+        var d = Math.abs(aMidi - (base + off)); if (d < best) best = d;
+      });
+    });
+    return best;
+  }
+  var _vlCache = {};
+  function vlCost(a, b){
+    var key = a.id + '>' + b.id;
+    if (_vlCache[key] != null) return _vlCache[key];
+    var A = pcsOf(a), B = pcsOf(b);
+    if (!A.length || !B.length){ _vlCache[key] = null; return null; }
+    var aMidis = A.map(function(p){ return 60 + p; });
+    var n = Math.min(A.length, B.length);
+    var big = (A.length >= B.length) ? aMidis : B.map(function(p){ return 60 + p; });
+    var small = (A.length >= B.length) ? B : A;
+    // permutations of the small set against the first n of the big set is not
+    // enough — try every assignment of small notes to distinct big notes.
+    var best = 1e9;
+    var used = new Array(big.length).fill(false);
+    (function bt(i, acc){
+      if (acc >= best) return;
+      if (i === n){ best = acc; return; }
+      for (var j = 0; j < big.length; j++){
+        if (used[j]) continue;
+        used[j] = true;
+        var c = (A.length >= B.length) ? nearestOctCost(big[j], small[i]) : nearestOctCost(big[j], small[i]);
+        bt(i + 1, acc + c);
+        used[j] = false;
+      }
+    })(0, 0);
+    var cost = best + 3 * Math.abs(A.length - B.length);
+    _vlCache[key] = cost;
+    return cost;
+  }
+  function clearBadges(){
+    document.querySelectorAll('.hw208-badge').forEach(function(b){ b.remove(); });
+  }
+  function setBadges(fromId){
+    clearBadges();
+    var from = null;
+    try{ from = chords.find(function(c){ return c.id === fromId; }); }catch(e){}
+    if (!from || !from.resolves) return;
+    from.resolves.forEach(function(tid){
+      var to = null;
+      try{ to = chords.find(function(c){ return c.id === tid; }); }catch(e){}
+      if (!to) return;
+      try{ // mirror hw201's flash visibility filters
+        if ((to.ext && !extEnabled) || (to.sus && !susEnabled)) return;
+        if (typeof MUTED_TYPES !== 'undefined' && (MUTED_TYPES.has(to.type) || (MUTED_TYPES.has('dim') && to.type === 'dim7'))) return;
+      }catch(e){}
+      var el = document.querySelector('.node[data-chord-id="' + tid + '"]');
+      if (!el) return;
+      var cost = vlCost(from, to);
+      if (cost == null) return;
+      var b = document.createElement('span'); b.className = 'hw208-badge';
+      b.textContent = cost;
+      b.title = 'Voice leading to ' + (to.label || tid) + ': ' + cost + ' semitones of movement (lower = smoother)';
+      el.appendChild(b);
+    });
+  }
+  var _origStart = (typeof startPersistentFlow === 'function') ? startPersistentFlow : null;
+  var _origStop = (typeof stopPersistentFlow === 'function') ? stopPersistentFlow : null;
+  if (_origStart){
+    startPersistentFlow = function(id){
+      var r = _origStart.apply(this, arguments);
+      try{ setBadges(id); }catch(e){}
+      return r;
+    };
+  }
+  if (_origStop){
+    stopPersistentFlow = function(){
+      var r = _origStop.apply(this, arguments);
+      try{ clearBadges(); }catch(e){}
+      return r;
+    };
+  }
+  setInterval(function(){
+    decorate();
+    try{ if ((typeof activeId === 'undefined' || !activeId)) clearBadges(); }catch(e){}
+  }, 1300);
+  setTimeout(decorate, 1600);
+
+  window._hw208 = { version: 'v208', decorate: decorate, vlCost: vlCost, setBadges: setBadges, clearBadges: clearBadges };
 })();
 </script>
 </body>
