@@ -34,7 +34,7 @@
 <div id="chord-tooltip"><div id="tt-name"></div><div id="tt-roman"></div><div id="tt-type"></div><div id="tt-notes"></div><div id="tt-resolves"></div><div id="tt-shared" style="display:none;margin-top:0.28rem;padding-top:0.22rem;border-top:1px solid rgba(255,255,255,0.06);"></div><div id="tt-theory-body" style="display:none;margin-top:0.32rem;padding-top:0.28rem;border-top:1px solid rgba(255,255,255,0.07);font-size:0.52rem;color:rgba(255,255,255,0.65);line-height:1.6;"></div><div id="tt-theory-why" style="display:none;font-size:0.46rem;color:var(--ext);margin-top:0.18rem;font-style:italic;"></div><div id="tt-grip-suggest" style="margin-top:0.28rem;display:none;line-height:1.6;"></div></div>
 
 <div id="topbar">
-  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v208</span></div>
+  <div id="topbar-title">Harmony Web<span>Interactive Chord Flowchart</span><span id="hw110-badge" style="display:inline-block;margin-left:0.55rem;padding:0.08rem 0.5rem;border:1px solid rgba(230,200,122,0.65);border-radius:20px;color:#e6c87a;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;vertical-align:middle;">BUILD v209</span></div>
   <div style="display:flex;gap:0.2rem;align-items:center;flex-shrink:0;">
       <button class="page-tab active" id="tab-web">🎵 Web</button>
       <button class="page-tab" id="tab-cof">⬡ Tonnetz</button>
@@ -28582,7 +28582,7 @@ loadKey = function(ri){
 <!-- Copyright Notice -->
 <div id="copyright-bar">
   <span>© 2026 Damian Dru (Pilot) · Doramondo · Fire Revival. All rights reserved.</span>
-  <span>Harmony Web (build v208) — Unauthorized reproduction or distribution is prohibited.</span>
+  <span>Harmony Web (build v209) — Unauthorized reproduction or distribution is prohibited.</span>
 </div>
 
 <div id="node-hover-card"></div>
@@ -42245,9 +42245,10 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
       }
     });
   }
-  function relax(){
+  function relax(redist){
     if (relaxing || window._hw204off) return;
-    if (window._hw41MouseDown) { schedule(700); return; }
+    if (window._hw41MouseDown) { schedule(700, redist); return; }
+    var SPRING = redist ? 0.06 : 0.012, ITERS = redist ? 420 : 280;
     var wa = document.getElementById('web-area'); if (!wa) return;
     var g = window._hw18Geo; if (!g) return;
     var W = wa.clientWidth, H = wa.clientHeight, cx = g.cx, cy = g.cy, tickR = g.R * 1.22;
@@ -42265,9 +42266,9 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
     });
     if (!items.length) return;
     relaxing = true;
-    for (var it = 0; it < 280; it++){
+    for (var it = 0; it < ITERS; it++){
       var i, j, t, a, b, dx, dy, ox, oy, mx, my, aM, bM;
-      for (i = 0; i < items.length; i++){ t = items[i]; if (!t.fixed){ t.x += (t.ax - t.x) * 0.012; t.y += (t.ay - t.y) * 0.012; } }
+      for (i = 0; i < items.length; i++){ t = items[i]; if (!t.fixed){ t.x += (t.ax - t.x) * SPRING; t.y += (t.ay - t.y) * SPRING; } }
       for (i = 0; i < items.length; i++) for (j = i + 1; j < items.length; j++){
         a = items[i]; b = items[j];
         dx = b.x - a.x; dy = b.y - a.y;
@@ -42302,11 +42303,105 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
     });
     relaxing = false;
   }
-  function schedule(ms){
+  function schedule(ms, redist){
     if (window._hw204off) return;
     clearTimeout(scheduled);
-    scheduled = setTimeout(function(){ decorate(); relax(); }, ms || 900);
+    scheduled = setTimeout(function(){ decorate(); relax(redist); }, ms || 900);
   }
+  /* hw209 — pills ALWAYS rearrange into empty space around their parent.
+     His case: turn a chord type OFF and the rest stayed in their old
+     formation, clumped, with holes where the hidden family sat — the seat's
+     tolerance early-exit kept the stale layout and the old relax only
+     de-overlapped in place. Now: any change in the visible pill set forces
+     a fresh parent-ray seat (no-arg hw38Seat skips its early-exit; user
+     locks/drag positions are still honoured by the seat itself) followed
+     by a redistribute relax whose stronger spring pulls each pill to its
+     new seat. A watchdog also catches stray overlaps (post-drag, resize,
+     AUTO changes) so the web never sits overlapped. */
+  var lastSig = null;
+  function visibleSig(){
+    var ids = [];
+    try{
+      chords.forEach(function(ch){
+        var el = nodeEls[ch.id];
+        if (el && isSat(ch, el)) ids.push(ch.id);
+      });
+    }catch(e){}
+    return ids.sort().join(',');
+  }
+  function anyOverlap(){
+    var els = [];
+    try{
+      chords.forEach(function(ch){
+        var el = nodeEls[ch.id];
+        if (el && isSat(ch, el)) els.push(el);
+      });
+    }catch(e){ return false; }
+    for (var i = 0; i < els.length; i++) for (var j = i + 1; j < els.length; j++){
+      var a = els[i], b = els[j];
+      var dx = Math.abs(parseFloat(a.style.left) - parseFloat(b.style.left));
+      var dy = Math.abs(parseFloat(a.style.top) - parseFloat(b.style.top));
+      if (dx < (a.offsetWidth + b.offsetWidth) / 2 - 2 && dy < (a.offsetHeight + b.offsetHeight) / 2 - 2) return true;
+    }
+    return false;
+  }
+  function settleOnce(){
+    if (window._hw204off || window._hw41MouseDown) return;
+    /* The blocker was the v45 auto-lock bank: once the web settles, every
+       satellite's seat is recorded in _hw45Lock and the seat never moves a
+       locked pill again — so hiding a family left the rest pinned in the
+       old formation. Release the AUTO-locks (user drags in _hwFreePos stay
+       pinned — those are deliberate) and the seat's greedy ray fan then
+       compacts the visible pills into the freed slots along their own
+       root-pitch rays. The seat defers fanning until geometry is stable
+       (~600 ms) and retries itself, so a second polish relax follows. */
+    try{
+      if (window._hw45Lock){
+        Object.keys(window._hw45Lock).forEach(function(id){
+          if (window._hwFreePos && window._hwFreePos[id]) return;
+          delete window._hw45Lock[id];
+        });
+      }
+    }catch(e){}
+    try{ if (typeof window.hw38Seat === 'function') window.hw38Seat(); }catch(e){}
+    schedule(250, true);
+    setTimeout(function(){ schedule(60, true); }, 1700);
+  }
+  /* A family toggle rebuilds the whole key (loadKey): the app's own seat
+     passes keep landing for seconds and re-lock pills wherever they end
+     up — including on top of the pills the last settle just compacted.
+     One settle shot is therefore not enough: fire three, spread across
+     the rebuild's tail, each releasing the locks anew. The last shot is
+     what a manual settle proved works — by then the app has gone quiet.
+     Overlaps that survive all three shots escalate to another settle. */
+  var sigTimers = [], settledSig = null, ovTicks = 0;
+  function armSettle(sig){
+    sigTimers.forEach(clearTimeout); sigTimers = [];
+    [900, 2800, 5200].forEach(function(d){
+      sigTimers.push(setTimeout(function(){
+        settleOnce();
+        if (d === 5200) settledSig = sig;
+      }, d));
+    });
+  }
+  function settle(){ armSettle(visibleSig()); }
+  setInterval(function(){
+    if (window._hw204off || window._hw41MouseDown) return;
+    var sig = visibleSig();
+    if (lastSig === null){ lastSig = sig; settledSig = sig; return; }
+    if (sig !== lastSig){ lastSig = sig; armSettle(sig); return; }
+    if (sig !== settledSig) return; /* shots in flight */
+    if (anyOverlap()){
+      ovTicks++;
+      if (ovTicks >= 3){ ovTicks = 0; settleOnce(); }
+      else schedule(300, true);
+    } else ovTicks = 0;
+  }, 1200);
+  var rszT = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(rszT);
+    rszT = setTimeout(settle, 450);
+  });
   var origLoad = loadKey;
   loadKey = function(){ var r = origLoad.apply(this, arguments); schedule(1100); return r; };
   if (typeof window.hw38Seat === 'function'){
@@ -42315,7 +42410,7 @@ body.hw198-th-porcelain #hw149-hp{ color:#8a6d1f !important; }
   }
   setInterval(function(){ if (!window._hw204off) decorate(); }, 2500);
   schedule(1600);
-  window._hw204 = { decorate: decorate, relax: relax, version: 'v204',
+  window._hw204 = { decorate: decorate, relax: relax, settle: settle, version: 'v209',
     restore: function(){
       window._hw204off = true;
       document.querySelectorAll('.hw204-pill').forEach(function(el){ el.classList.remove('hw204-pill'); });
